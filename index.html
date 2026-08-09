@@ -149,6 +149,52 @@
     box-shadow: 0 0 14px rgba(212,160,23,0.7);
   }
   .compare-label{ font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color: var(--slate); margin: 14px 0 6px; }
+
+  /* ---- Multi-combination ticket entry ---- */
+  .combo-row{
+    display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+    padding:10px 0; border-bottom:1px solid rgba(18,32,60,0.08);
+  }
+  .combo-row:last-child{ border-bottom:none; }
+  .combo-num{ font-size:11px; font-weight:800; color: var(--slate); width:20px; flex-shrink:0; }
+  .combo-balls{ display:flex; gap:6px; flex-wrap:wrap; }
+  .combo-remove{
+    margin-left:auto; background:none; border:none; color:#b23b3b; font-weight:800;
+    font-size:15px; cursor:pointer; padding:4px 8px;
+  }
+  .add-combo-btn{ margin-top:6px; }
+
+  /* ---- Results finder ---- */
+  .finder-controls{ display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
+  .finder-dates{ display:flex; gap:8px; }
+  .finder-dates > div{ flex:1; }
+  .finder-dates label{ font-size:10px; letter-spacing:1px; text-transform:uppercase; color: var(--slate); display:block; margin-bottom:4px; }
+
+  .result-card{
+    background: rgba(18,32,60,0.04); border-radius:12px; padding:14px; margin-bottom:12px;
+  }
+  .result-card-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+  .result-card-game{ font-weight:800; font-size:14px; }
+  .result-card-date{ font-size:11.5px; color: var(--slate); }
+  .mini-ball{
+    width:32px; height:32px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:12.5px; border: 2px solid rgba(18,32,60,0.18);
+    background: rgba(255,255,255,0.5); flex-shrink:0;
+  }
+  .mini-ball.match{
+    background:#2ecc71; border-color:#229954; color:#08210f;
+    box-shadow: 0 0 8px rgba(46,204,113,0.55);
+  }
+  .combo-compare-row{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .combo-compare-label{ font-size:11px; color: var(--slate); width:56px; flex-shrink:0; }
+  .combo-match-badge{
+    margin-left:auto; font-size:11px; font-weight:800; padding:3px 8px; border-radius:20px;
+    background: rgba(18,32,60,0.08); color: var(--slate);
+  }
+  .combo-match-badge.win{ background:#2ecc71; color:#08210f; }
+  .combo-match-badge.jackpot{ background: var(--gold); color: var(--ink); }
+
   .compare-label.result-lbl{ color: rgba(247,242,228,0.4); }
 
   .note{
@@ -386,10 +432,9 @@
 
   <div class="ticket">
     <div class="ticket-top">
-      <div class="stub-label">1 · Your Ticket</div>
+      <div class="stub-label">1 · Your Combinations</div>
 
       <select id="gameSelect"></select>
-      <input type="date" id="drawDate">
 
       <div class="toggle-row">
         <button id="tabManual" class="active" onclick="setEntryMode('manual')">Type Numbers</button>
@@ -397,7 +442,8 @@
       </div>
 
       <div id="manualEntry">
-        <div class="balls-row" id="ticketBalls"></div>
+        <div id="combosList"></div>
+        <button class="btn btn-secondary add-combo-btn" onclick="addCombo()">+ Add Another Combination</button>
       </div>
 
       <div id="photoEntry" style="display:none;">
@@ -406,29 +452,45 @@
         <div class="ocr-status" id="ocrStatus"></div>
       </div>
     </div>
-
-    <div class="perf"></div>
-
-    <div class="ticket-bottom">
-      <div class="stub-label">2 · Official Draw Result</div>
-      <div class="balls-row" id="resultBalls"></div>
-      <button class="btn btn-primary" onclick="checkTicket()">Check My Ticket</button>
-    </div>
   </div>
 
-  <div class="result-panel" id="resultPanel">
-    <div class="verdict" id="verdictText">—</div>
-    <div class="verdict-sub" id="verdictSub"></div>
+  <div class="section-gap"></div>
 
-    <div class="compare-label">Your Numbers</div>
-    <div class="balls-compare" id="compareTicket"></div>
+  <div class="schedule-card">
+    <div class="stub-label" style="color:rgba(247,242,228,0.55)">2 · Find Draw Results</div>
 
-    <div class="compare-label result-lbl">Winning Numbers</div>
-    <div class="balls-compare" id="compareResult"></div>
+    <div class="finder-controls">
+      <select id="resultGameFilter"></select>
+      <div class="finder-dates">
+        <div>
+          <label>From</label>
+          <input type="date" id="resultFromDate">
+        </div>
+        <div>
+          <label>To</label>
+          <input type="date" id="resultToDate">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="findResults()" id="findResultsBtn">🔄 Find Results</button>
+    <div id="findResultsStatus" class="note" style="display:none; margin-top:10px;"></div>
+
+    <div id="resultsAndComparisons" style="margin-top:14px;"></div>
+
+    <details style="margin-top:10px;">
+      <summary style="cursor:pointer; font-size:12.5px; color: var(--slate);">Enter a result manually instead</summary>
+      <div style="margin-top:10px;">
+        <select id="manualResultGame"></select>
+        <input type="date" id="manualResultDate">
+        <div class="balls-row" id="manualResultBalls"></div>
+        <button class="btn btn-secondary" style="margin-top:8px;" onclick="addManualResult()">Add This Result</button>
+      </div>
+    </details>
   </div>
 
   <div class="note">
-    <b>Note:</b> Draw results here are entered manually for this prototype. The production build (Supabase + Cloudflare Edge Function) auto-fetches official PCSO results by date and game, falling back to manual entry if the fetch fails.
+    <b>Note:</b> "Find Results" pulls draw results from a public results archive by date (PCSO's own site blocks automated access). Pick just a game, just dates, or both — leave the game as "All Games" to see everything drawn in a date range, or pick one game to check it against all your combinations above. If a date isn't archived yet, or a game didn't draw that day, it's skipped.
   </div>
 
   <div class="section-gap"></div>
@@ -577,18 +639,20 @@ function nextDrawDateFor(gameId){
 
 function renderNextDraws(){
   // find overall soonest across all games
-  let soonest = null, soonestId = null;
+  let soonest = null;
   const upcoming = [];
   GAMES.forEach(g => {
     const d = nextDrawDateFor(g.id);
     if(d){
       upcoming.push({game: g, date: d});
-      if(!soonest || d.getTime() < soonest.getTime()){ soonest = d; soonestId = g.id; }
+      if(!soonest || d.getTime() < soonest.getTime()){ soonest = d; }
     }
   });
   upcoming.sort((a,b) => a.date - b.date);
 
-  const soonestGame = GAMES.find(g => g.id === soonestId);
+  // multiple games can share the exact same soonest draw time (same day + time)
+  const tiedGames = upcoming.filter(u => u.date.getTime() === soonest.getTime()).map(u => u.game);
+
   const hero = document.getElementById('nextDrawHero');
   const opts = {weekday:'short', month:'short', day:'numeric'};
 
@@ -599,15 +663,23 @@ function renderNextDraws(){
     const h = Math.floor(diff/3600000);
     const m = Math.floor((diff%3600000)/60000);
     const s = Math.floor((diff%60000)/1000);
+
+    const namesHtml = tiedGames.map(g =>
+      `<div class="nd-game">${g.label} ${SCHEDULE[g.id].hasWinner ? '' : '<span class="badge-rollover">ROLLOVER</span>'}</div>`
+    ).join('');
+    const jackpotsHtml = tiedGames.map(g =>
+      `<div class="nd-jackpot">${g.label}: <b>${pesos(SCHEDULE[g.id].jackpot)}</b></div>`
+    ).join('');
+
     hero.innerHTML = `
-      <div class="nd-game">${soonestGame.label} ${SCHEDULE[soonestId].hasWinner ? '' : '<span class="badge-rollover">ROLLOVER</span>'}</div>
-      <div class="nd-when">${soonest.toLocaleDateString('en-PH', opts)} · ${SCHEDULE[soonestId].time}</div>
+      ${namesHtml}
+      <div class="nd-when">${soonest.toLocaleDateString('en-PH', opts)} · ${SCHEDULE[tiedGames[0].id].time}</div>
       <div class="nd-countdown">
         <div class="nd-unit"><div class="num">${h}</div><div class="lbl">Hrs</div></div>
         <div class="nd-unit"><div class="num">${m}</div><div class="lbl">Min</div></div>
         <div class="nd-unit"><div class="num">${s}</div><div class="lbl">Sec</div></div>
       </div>
-      <div class="nd-jackpot">Estimated Jackpot: <b>${pesos(SCHEDULE[soonestId].jackpot)}</b></div>
+      ${jackpotsHtml}
     `;
   }
   paintHero();
@@ -695,19 +767,59 @@ function renderGameSelect(){
   sel.innerHTML = GAMES.map(g => `<option value="${g.id}">${g.label}</option>`).join('');
   sel.onchange = () => {
     currentGame = GAMES.find(g => g.id === sel.value);
-    renderBallInputs();
+    TICKET_COMBOS = [ new Array(currentGame.balls).fill(null) ];
+    renderCombos();
+    renderResultsAndComparisons();
   };
+
+  const filterSel = document.getElementById('resultGameFilter');
+  filterSel.innerHTML = '<option value="">All Games</option>' + GAMES.map(g => `<option value="${g.id}">${g.label}</option>`).join('');
+
+  const manualSel = document.getElementById('manualResultGame');
+  manualSel.innerHTML = GAMES.map(g => `<option value="${g.id}">${g.label}</option>`).join('');
+  manualSel.onchange = renderManualResultBalls;
 }
 
-function renderBallInputs(){
-  const ticketRow = document.getElementById('ticketBalls');
-  const resultRow = document.getElementById('resultBalls');
-  ticketRow.innerHTML = '';
-  resultRow.innerHTML = '';
-  for(let i=0;i<currentGame.balls;i++){
-    ticketRow.innerHTML += `<input class="ball-input mono" maxlength="2" inputmode="numeric" data-idx="${i}" id="t-${i}">`;
-    resultRow.innerHTML += `<input class="ball-input mono" maxlength="2" inputmode="numeric" data-idx="${i}" id="r-${i}">`;
-  }
+// ============ MULTI-COMBINATION TICKET ENTRY ============
+let TICKET_COMBOS = [ new Array(GAMES[0].balls).fill(null) ]; // array of number-arrays (null = empty slot)
+
+function addCombo(){
+  TICKET_COMBOS.push(new Array(currentGame.balls).fill(null));
+  renderCombos();
+}
+
+function removeCombo(idx){
+  TICKET_COMBOS.splice(idx, 1);
+  if(TICKET_COMBOS.length === 0) TICKET_COMBOS.push(new Array(currentGame.balls).fill(null));
+  renderCombos();
+  renderResultsAndComparisons();
+}
+
+function updateComboBall(comboIdx, ballIdx, value){
+  const n = parseInt(value, 10);
+  TICKET_COMBOS[comboIdx][ballIdx] = isNaN(n) ? null : n;
+  renderResultsAndComparisons();
+}
+
+function renderCombos(){
+  const list = document.getElementById('combosList');
+  list.innerHTML = TICKET_COMBOS.map((combo, ci) => `
+    <div class="combo-row">
+      <div class="combo-num">#${ci+1}</div>
+      <div class="combo-balls">
+        ${combo.map((v,bi) => `<input class="ball-input mono" maxlength="2" inputmode="numeric"
+            value="${v===null?'':v}"
+            onchange="updateComboBall(${ci},${bi},this.value)">`).join('')}
+      </div>
+      ${TICKET_COMBOS.length > 1 ? `<button class="combo-remove" onclick="removeCombo(${ci})">✕</button>` : ''}
+    </div>
+  `).join('');
+}
+
+function getCombosFilled(){
+  return TICKET_COMBOS
+    .map(c => c.filter(n => n !== null))
+    .filter(c => c.length === currentGame.balls);
 }
 
 function setEntryMode(mode){
@@ -725,76 +837,220 @@ document.getElementById('photoInput').addEventListener('change', async (e) => {
   try{
     const result = await Tesseract.recognize(file, 'eng');
     const text = result.data.text;
+    const balls = currentGame.balls;
+
+    // Keep numbers in the order they appear (NOT deduped globally) — a ticket
+    // with multiple bets/boards repeats or varies numbers across each bet,
+    // so global dedup would corrupt multi-bet tickets. Filter to valid range only.
     const nums = (text.match(/\b\d{1,2}\b/g) || [])
       .map(n => parseInt(n,10))
       .filter(n => n >= 1 && n <= currentGame.maxNum);
-    const unique = [...new Set(nums)].slice(0, currentGame.balls);
-    unique.forEach((n,i) => {
-      const el = document.getElementById('t-'+i);
-      if(el) el.value = n;
+
+    // Chunk into groups of `balls` — each full chunk becomes one combination.
+    const chunks = [];
+    for(let i=0; i<nums.length; i+=balls){
+      const chunk = nums.slice(i, i+balls);
+      if(chunk.length > 0) chunks.push(chunk);
+    }
+
+    if(chunks.length === 0){
+      status.textContent = `Couldn't detect any numbers. Try a clearer, well-lit photo or type them manually.`;
+      return;
+    }
+
+    TICKET_COMBOS = chunks.map(chunk => {
+      const combo = new Array(balls).fill(null);
+      chunk.forEach((n,i) => { combo[i] = n; });
+      return combo;
     });
-    status.textContent = unique.length === currentGame.balls
-      ? `Found ${unique.length} numbers — please double check against your ticket.`
-      : `Found ${unique.length}/${currentGame.balls} numbers. Fill in the rest manually — OCR isn't perfect on printed tickets.`;
+    renderCombos();
+    renderResultsAndComparisons();
+
+    const fullChunks = chunks.filter(c => c.length === balls).length;
+    status.textContent = chunks.length > 1
+      ? `Detected what looks like ${chunks.length} combination${chunks.length>1?'s':''} (${fullChunks} complete). OCR can misread ticket serials/prices as numbers — please double-check every combination against your printed ticket.`
+      : (chunks[0].length === balls
+          ? `Found ${balls} numbers — please double check against your ticket.`
+          : `Found ${chunks[0].length}/${balls} numbers. Fill in the rest manually — OCR isn't perfect on printed tickets.`);
     setEntryMode('manual');
   }catch(err){
     status.textContent = 'Could not read the image. Try a clearer, well-lit photo or type the numbers instead.';
   }
 });
 
-function getBalls(prefix){
-  const vals = [];
-  for(let i=0;i<currentGame.balls;i++){
-    const v = parseInt(document.getElementById(prefix+'-'+i).value, 10);
-    if(!isNaN(v)) vals.push(v);
+// ============ FIND DRAW RESULTS (date range + optional game filter) ============
+// Config: set this to your deployed Supabase Edge Function URL after deploying.
+// Example: https://YOUR-PROJECT-REF.supabase.co/functions/v1/fetch-draw-result
+const FETCH_RESULT_ENDPOINT = 'https://YOUR-PROJECT-REF.supabase.co/functions/v1/fetch-draw-result';
+const MAX_RANGE_DAYS = 31;
+
+let FETCHED_RESULTS = []; // [{date, game, gameLabel, numbers}]
+
+function dateRangeArray(fromStr, toStr){
+  const dates = [];
+  let d = new Date(fromStr+'T00:00:00');
+  const end = new Date(toStr+'T00:00:00');
+  while(d <= end && dates.length < MAX_RANGE_DAYS){
+    dates.push(d.toISOString().slice(0,10));
+    d.setDate(d.getDate()+1);
   }
-  return vals;
+  return dates;
 }
 
-function checkTicket(){
-  const ticket = getBalls('t');
-  const result = getBalls('r');
+async function findResults(){
+  const btn = document.getElementById('findResultsBtn');
+  const statusEl = document.getElementById('findResultsStatus');
+  statusEl.style.display = 'block';
 
-  if(ticket.length !== currentGame.balls || result.length !== currentGame.balls){
-    alert(`Enter all ${currentGame.balls} numbers for both your ticket and the official result.`);
+  if(FETCH_RESULT_ENDPOINT.includes('YOUR-PROJECT-REF')){
+    statusEl.textContent = 'Auto-fetch isn\u2019t configured yet \u2014 use "Enter a result manually instead" below.';
     return;
   }
 
-  const matches = ticket.filter(n => result.includes(n));
-  const matchCount = matches.length;
-  const tier = currentGame.tiers.find(t => t.match === matchCount);
+  const gameFilter = document.getElementById('resultGameFilter').value; // '' = all games
+  const from = document.getElementById('resultFromDate').value;
+  const to = document.getElementById('resultToDate').value;
 
-  const panel = document.getElementById('resultPanel');
-  const verdict = document.getElementById('verdictText');
-  const sub = document.getElementById('verdictSub');
-
-  if(tier && tier.match === currentGame.balls){
-    verdict.textContent = '🎉 JACKPOT WINNER';
-    verdict.className = 'verdict jackpot';
-    sub.textContent = `All ${currentGame.balls} numbers matched. Verify at the nearest PCSO branch before celebrating too hard.`;
-    markJackpotWon(currentGame.id);
-  } else if(tier){
-    verdict.textContent = `WINNER — ${tier.label}`;
-    verdict.className = 'verdict minor';
-    sub.textContent = `${matchCount} of ${currentGame.balls} numbers matched. Check official PCSO prize tables for the exact amount.`;
-  } else {
-    verdict.textContent = 'NO WIN THIS DRAW';
-    verdict.className = 'verdict none';
-    sub.textContent = `${matchCount} of ${currentGame.balls} numbers matched. Better luck next draw.`;
+  if(!from || !to){
+    statusEl.textContent = 'Pick a From and To date first.';
+    return;
+  }
+  if(from > to){
+    statusEl.textContent = '"From" date must be before "To" date.';
+    return;
   }
 
-  const compT = document.getElementById('compareTicket');
-  const compR = document.getElementById('compareResult');
-  compT.innerHTML = ticket.map(n => `<div class="ball ${result.includes(n)?'match':''}">${n}</div>`).join('');
-  compR.innerHTML = result.map(n => `<div class="ball ${ticket.includes(n)?'match':''}">${n}</div>`).join('');
+  const dates = dateRangeArray(from, to);
+  btn.disabled = true;
+  btn.textContent = `\u23f3 Fetching ${dates.length} day${dates.length>1?'s':''}\u2026`;
+  statusEl.textContent = '';
 
-  panel.classList.add('show');
-  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+  try{
+    const calls = dates.map(d => {
+      const qs = gameFilter
+        ? `game=${encodeURIComponent(gameFilter)}&date=${encodeURIComponent(d)}`
+        : `date=${encodeURIComponent(d)}`;
+      return fetch(`${FETCH_RESULT_ENDPOINT}?${qs}`).then(r => r.json()).catch(() => ({success:false}));
+    });
+    const responses = await Promise.all(calls);
 
-  logDrawResult(currentGame.id, document.getElementById('drawDate').value, result);
-  logUserPick(currentGame.id, document.getElementById('drawDate').value, ticket);
+    const newResults = [];
+    responses.forEach(data => {
+      if(data && data.success && Array.isArray(data.results)){
+        data.results.forEach(r => {
+          newResults.push({ date: data.date, game: r.game, gameLabel: r.gameLabel, numbers: r.numbers });
+          logDrawResult(r.game, data.date, r.numbers);
+        });
+      }
+    });
+
+    // merge into FETCHED_RESULTS, replacing same date+game entries
+    newResults.forEach(nr => {
+      const i = FETCHED_RESULTS.findIndex(r => r.date === nr.date && r.game === nr.game);
+      if(i > -1) FETCHED_RESULTS[i] = nr; else FETCHED_RESULTS.push(nr);
+    });
+    FETCHED_RESULTS.sort((a,b) => b.date.localeCompare(a.date));
+
+    statusEl.textContent = newResults.length
+      ? `Found ${newResults.length} result${newResults.length>1?'s':''} across ${dates.length} day${dates.length>1?'s':''}. Source: third-party aggregator, not PCSO directly \u2014 worth a quick visual double-check.`
+      : `No results found for that range/game combination \u2014 the archive may not have those dates yet, or those games didn't draw then. Try "Enter a result manually instead" below.`;
+
+    getCombosFilled().forEach(combo => logUserPick(currentGame.id, to, combo));
+
+    renderResultsAndComparisons();
+    runAnalysis();
+  }catch(err){
+    statusEl.textContent = 'Auto-fetch failed (network error). Try "Enter a result manually instead" below.';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '\ud83d\udd04 Find Results';
+  }
+}
+
+function renderManualResultBalls(){
+  const g = GAMES.find(x => x.id === document.getElementById('manualResultGame').value) || currentGame;
+  const row = document.getElementById('manualResultBalls');
+  row.innerHTML = '';
+  for(let i=0;i<g.balls;i++){
+    row.innerHTML += `<input class="ball-input mono" maxlength="2" inputmode="numeric" id="mr-${i}">`;
+  }
+}
+
+function addManualResult(){
+  const gameId = document.getElementById('manualResultGame').value;
+  const g = GAMES.find(x => x.id === gameId);
+  const date = document.getElementById('manualResultDate').value;
+  if(!date){ alert('Pick a date for this result.'); return; }
+
+  const numbers = [];
+  for(let i=0;i<g.balls;i++){
+    const v = parseInt(document.getElementById('mr-'+i).value, 10);
+    if(!isNaN(v)) numbers.push(v);
+  }
+  if(numbers.length !== g.balls){
+    alert(`Enter all ${g.balls} numbers.`);
+    return;
+  }
+
+  const i = FETCHED_RESULTS.findIndex(r => r.date === date && r.game === gameId);
+  const entry = { date, game: gameId, gameLabel: g.label.split(' ').pop(), numbers };
+  if(i > -1) FETCHED_RESULTS[i] = entry; else FETCHED_RESULTS.push(entry);
+  FETCHED_RESULTS.sort((a,b) => b.date.localeCompare(a.date));
+
+  logDrawResult(gameId, date, numbers);
+  if(gameId === currentGame.id){
+    getCombosFilled().forEach(combo => logUserPick(currentGame.id, date, combo));
+  }
+  renderResultsAndComparisons();
   runAnalysis();
 }
+
+function renderResultsAndComparisons(){
+  const container = document.getElementById('resultsAndComparisons');
+  if(FETCHED_RESULTS.length === 0){
+    container.innerHTML = '';
+    return;
+  }
+
+  const combos = getCombosFilled(); // only combos matching currentGame.balls, i.e. for currentGame
+
+  container.innerHTML = FETCHED_RESULTS.map(r => {
+    const resultBalls = r.numbers.map(n => `<div class="mini-ball">${n}</div>`).join('');
+
+    let comparisonHtml = '';
+    if(r.game === currentGame.id && combos.length){
+      comparisonHtml = combos.map((combo, ci) => {
+        const matchCount = combo.filter(n => r.numbers.includes(n)).length;
+        const tier = currentGame.tiers.find(t => t.match === matchCount);
+        let badgeClass = '', badgeText = `${matchCount}/${currentGame.balls}`;
+        if(tier && tier.match === currentGame.balls){
+          badgeClass = 'jackpot'; badgeText = '🎉 JACKPOT';
+          markJackpotWon(currentGame.id);
+        } else if(tier){
+          badgeClass = 'win'; badgeText = `${matchCount}/${currentGame.balls} \u2014 ${tier.label}`;
+        }
+        const ballsHtml = combo.map(n => `<div class="mini-ball ${r.numbers.includes(n)?'match':''}">${n}</div>`).join('');
+        return `
+          <div class="combo-compare-row">
+            <div class="combo-compare-label">#${ci+1}</div>
+            ${ballsHtml}
+            <div class="combo-match-badge ${badgeClass}">${badgeText}</div>
+          </div>`;
+      }).join('');
+    }
+
+    return `
+      <div class="result-card">
+        <div class="result-card-head">
+          <div class="result-card-game">${r.gameLabel}</div>
+          <div class="result-card-date">${r.date}</div>
+        </div>
+        <div class="combo-balls">${resultBalls}</div>
+        ${comparisonHtml}
+      </div>`;
+  }).join('');
+}
+
 
 // ============ ANALYSIS, GENERATOR, FAVORITES ============
 
@@ -988,8 +1244,10 @@ function generateCombo(mode){
 function fillTicketWith(gameId, numbers){
   document.getElementById('gameSelect').value = gameId;
   currentGame = GAMES.find(g => g.id === gameId);
-  renderBallInputs();
-  numbers.forEach((n,i) => { const el = document.getElementById('t-'+i); if(el) el.value = n; });
+  TICKET_COMBOS = [ new Array(currentGame.balls).fill(null) ];
+  numbers.forEach((n,i) => { if(i < currentGame.balls) TICKET_COMBOS[0][i] = n; });
+  renderCombos();
+  renderResultsAndComparisons();
   document.querySelector('.ticket').scrollIntoView({behavior:'smooth'});
 }
 
@@ -1002,11 +1260,12 @@ function quickSaveFavorite(gameId, numbers){
 }
 
 function saveTicketAsFavorite(){
-  const ticket = getBalls('t');
-  if(ticket.length !== currentGame.balls){
-    alert(`Fill in all ${currentGame.balls} ticket numbers first.`);
+  const filled = getCombosFilled();
+  if(filled.length === 0){
+    alert(`Fill in all ${currentGame.balls} numbers for at least one combination first.`);
     return;
   }
+  const ticket = filled[0];
   const label = document.getElementById('favLabel').value.trim() || `${currentGame.label} favorite`;
   const scope = document.getElementById('favScope').value;
   FAVORITES.push({id: Date.now(), label, scope, numbers: ticket});
@@ -1081,8 +1340,16 @@ function dismissIntro(){
 
 // init
 renderGameSelect();
-renderBallInputs();
-document.getElementById('drawDate').valueAsDate = new Date();
+renderCombos();
+renderManualResultBalls();
+(function initDateDefaults(){
+  const today = new Date();
+  const weekAgo = new Date();
+  weekAgo.setDate(today.getDate() - 6);
+  document.getElementById('resultFromDate').valueAsDate = weekAgo;
+  document.getElementById('resultToDate').valueAsDate = today;
+  document.getElementById('manualResultDate').valueAsDate = today;
+})();
 renderNextDraws();
 renderScheduleTable();
 renderAnalysisSelectors();
