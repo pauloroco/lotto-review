@@ -897,6 +897,16 @@ function dateRangeArray(fromStr, toStr){
   return dates;
 }
 
+function updateScheduleJackpotFromFetch(gameId, jackpotStr){
+  if(!jackpotStr || !SCHEDULE[gameId]) return;
+  const num = parseFloat(jackpotStr.replace(/[₱,]/g, ''));
+  if(isNaN(num) || num <= 0) return;
+  SCHEDULE[gameId].jackpot = num;
+  SCHEDULE[gameId].jackpotIsLive = true;
+  renderNextDraws();
+  renderScheduleTable();
+}
+
 async function findResults(){
   const btn = document.getElementById('findResultsBtn');
   const statusEl = document.getElementById('findResultsStatus');
@@ -938,17 +948,17 @@ async function findResults(){
     responses.forEach(data => {
       if(data && data.success && Array.isArray(data.results)){
         data.results.forEach(r => {
-          newResults.push({ date: data.date, game: r.game, gameLabel: r.gameLabel, numbers: r.numbers });
+          newResults.push({ date: data.date, game: r.game, gameLabel: r.gameLabel, numbers: r.numbers, jackpot: r.jackpot || null });
           logDrawResult(r.game, data.date, r.numbers);
+          updateScheduleJackpotFromFetch(r.game, r.jackpot);
         });
       }
     });
 
-    // merge into FETCHED_RESULTS, replacing same date+game entries
-    newResults.forEach(nr => {
-      const i = FETCHED_RESULTS.findIndex(r => r.date === nr.date && r.game === nr.game);
-      if(i > -1) FETCHED_RESULTS[i] = nr; else FETCHED_RESULTS.push(nr);
-    });
+    // Each search shows exactly what matches the current query — replace,
+    // don't accumulate, so results from a previous unrelated search don't
+    // linger and show up alongside a new one.
+    FETCHED_RESULTS = newResults;
     FETCHED_RESULTS.sort((a,b) => b.date.localeCompare(a.date));
 
     statusEl.textContent = newResults.length
@@ -993,7 +1003,7 @@ function addManualResult(){
   }
 
   const i = FETCHED_RESULTS.findIndex(r => r.date === date && r.game === gameId);
-  const entry = { date, game: gameId, gameLabel: g.label.split(' ').pop(), numbers };
+  const entry = { date, game: gameId, gameLabel: g.label.split(' ').pop(), numbers, jackpot: null };
   if(i > -1) FETCHED_RESULTS[i] = entry; else FETCHED_RESULTS.push(entry);
   FETCHED_RESULTS.sort((a,b) => b.date.localeCompare(a.date));
 
@@ -1046,6 +1056,7 @@ function renderResultsAndComparisons(){
           <div class="result-card-date">${r.date}</div>
         </div>
         <div class="combo-balls">${resultBalls}</div>
+        ${r.jackpot ? `<div class="result-card-date" style="margin-top:6px;">Jackpot that draw: <b>${r.jackpot}</b></div>` : ''}
         ${comparisonHtml}
       </div>`;
   }).join('');
