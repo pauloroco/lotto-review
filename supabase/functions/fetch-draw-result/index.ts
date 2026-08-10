@@ -8,12 +8,13 @@
 //   2. ?date=YYYY-MM-DD&game=6-42    -> just that one game on that date
 //   3. ?game=6-42                    -> latest published result for that game
 //
-// Mode 2 also falls back to the per-game "latest result" page if the daily
-// archive page is missing or doesn't have that game yet (the per-game page
-// sometimes updates a little faster same-day).
-//
-// For date-range browsing, the frontend calls this once per date in the
-// range (mode 1 or 2) and aggregates results client-side.
+// Parsing approach: scan for every "Winning Combination" occurrence on the
+// page (these only appear right inside a real per-game results table), then
+// for each one, look a short distance BACKWARD to find which game label is
+// closest — that's the game that table belongs to. This is more robust than
+// searching for game-label text first, since a label like "6/42 Lotto" can
+// also appear in navigation/related-links text elsewhere on the page, far
+// from any real table; anchoring on "Winning Combination" avoids that.
 //
 // Deploy with: supabase functions deploy fetch-draw-result --no-verify-jwt
 
@@ -108,6 +109,51 @@ function extractJackpot(text: string): string | null {
   return m ? m[1].replace(/^P\s?/, "₱") : null;
 }
 
+// Scan every "Winning Combination" occurrence on the page and, for each,
+// find the closest preceding game-label mention within a short window —
+// that's the real table this combination belongs to. Anchoring on the
+// combination marker (not the label) avoids matching unrelated label
+// mentions elsewhere on the page (nav links, "related results", etc.).
+function findAllResultTables(text: string): (GameResult & { pos: number })[] {
+  const out: (GameResult & { pos: number })[] = [];
+  let searchFrom = 0;
+
+  while (true) {
+    const wcIdx = text.indexOf("Winning Combination", searchFrom);
+    if (wcIdx === -1) break;
+
+    const lookback = 250;
+    const windowStart = Math.max(0, wcIdx - lookback);
+    const before = text.slice(windowStart, wcIdx);
+
+    let bestGid: string | null = null;
+    let bestPos = -1;
+    for (const gid of ALL_GAME_IDS) {
+      const label = GAME_TABLE_LABELS[gid];
+      const labelIdx = before.lastIndexOf(label);
+      if (labelIdx !== -1) {
+        const absPos = windowStart + labelIdx;
+        if (absPos > bestPos) { bestPos = absPos; bestGid = gid; }
+      }
+    }
+
+    const combWindow = text.slice(wcIdx, wcIdx + 200);
+    const numbers = extractNumbers(combWindow);
+    const jackpot = extractJackpot(combWindow);
+
+    if (bestGid && numbers) {
+      // avoid duplicate entries for the same game (keep the first/closest one found)
+      if (!out.some((r) => r.game === bestGid)) {
+        out.push({ game: bestGid, gameLabel: GAME_LABELS[bestGid], numbers, jackpot, pos: wcIdx });
+      }
+    }
+
+    searchFrom = wcIdx + "Winning Combination".length;
+  }
+
+  return out;
+}
+
 function userAgentHeader() {
   return { "User-Agent": "Mozilla/5.0 (compatible; LottoReviewBot/1.0; +https://lottoreview.pausystems.com)" };
 }
@@ -127,20 +173,18 @@ async function fetchLatest(gameId: string): Promise<{ date: string; result: Game
   if (!res.ok) return null;
 
   const text = stripTags(await res.text());
-  const idx = text.indexOf("Winning Combination");
-  if (idx === -1) return null;
+  const tables = findAllResultTables(text);
+  if (tables.length === 0) return null;
 
-  const before = text.slice(Math.max(0, idx - 200), idx);
+  // this page is dedicated to one game, so take the first (topmost) table found
+  const first = tables.sort((a, b) => a.pos - b.pos)[0];
+  const before = text.slice(Math.max(0, first.pos - 250), first.pos);
   const drawDate = parseDateToISO(before);
-  const window = text.slice(idx, idx + 300);
-  const numbers = extractNumbers(window);
-  const jackpot = extractJackpot(window);
-
-  if (!numbers || !drawDate) return null;
+  if (!drawDate) return null;
 
   return {
     date: drawDate,
-    result: { game: gameId, gameLabel: GAME_LABELS[gameId], numbers, jackpot },
+    result: { game: gameId, gameLabel: GAME_LABELS[gameId], numbers: first.numbers, jackpot: first.jackpot },
     source: sourceUrl,
   };
 }
@@ -169,31 +213,16 @@ async function fetchByDate(isoDate: string, gameId: string | null): Promise<Resp
   const sourceUrl = `https://www.lottopcso.com/pcso-lotto-result-${slug}/`;
   const res = await fetch(sourceUrl, { headers: userAgentHeader() });
 
-  let text = "";
+  let allTables: (GameResult & { pos: number })[] = [];
   const archiveOk = res.ok;
-  if (archiveOk) text = stripTags(await res.text());
-
-  const gamesToCheck = gameId ? [gameId] : ALL_GAME_IDS;
-  const results: GameResult[] = [];
-
   if (archiveOk) {
-    for (const gid of gamesToCheck) {
-      const label = GAME_TABLE_LABELS[gid];
-      const idx = text.indexOf(label);
-      if (idx === -1) continue; // this game didn't draw on this date (or not on this page)
-
-      const after = text.slice(idx, idx + 300);
-      const wcIdx = after.indexOf("Winning Combination");
-      if (wcIdx === -1) continue;
-
-      const window = after.slice(wcIdx, wcIdx + 200);
-      const numbers = extractNumbers(window);
-      if (!numbers) continue;
-      const jackpot = extractJackpot(window);
-
-      results.push({ game: gid, gameLabel: GAME_LABELS[gid], numbers, jackpot });
-    }
+    const text = stripTags(await res.text());
+    allTables = findAllResultTables(text);
   }
+
+  let results: GameResult[] = gameId
+    ? allTables.filter((t) => t.game === gameId)
+    : allTables;
 
   // Fallback: single-game lookup where the archive page failed or didn't have
   // this game yet — try the per-game "latest" page, and use it only if its
