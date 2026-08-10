@@ -163,6 +163,18 @@
     font-size:15px; cursor:pointer; padding:4px 8px;
   }
   .add-combo-btn{ margin-top:6px; }
+  .combo-paste{
+    display:flex; gap:6px; width:100%; margin-bottom:6px;
+  }
+  .combo-paste-input{
+    flex:1; min-width:0; padding:8px 10px; border-radius:8px;
+    border:1.5px solid rgba(18,32,60,0.15); background:rgba(255,255,255,0.6);
+    font-size:12.5px; color: var(--ink);
+  }
+  .btn-mini{
+    padding:6px 12px; border-radius:8px; border:none; background: var(--ink);
+    color: var(--cream); font-weight:700; font-size:12px; cursor:pointer; flex-shrink:0;
+  }
 
   /* ---- Results finder ---- */
   .finder-controls{ display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
@@ -767,7 +779,8 @@ function renderGameSelect(){
   sel.innerHTML = GAMES.map(g => `<option value="${g.id}">${g.label}</option>`).join('');
   sel.onchange = () => {
     currentGame = GAMES.find(g => g.id === sel.value);
-    TICKET_COMBOS = [ new Array(currentGame.balls).fill(null) ];
+    // combinations are stored per-game, so switching games does NOT lose them —
+    // it just switches which game's saved combinations are shown
     renderCombos();
     renderResultsAndComparisons();
   };
@@ -780,44 +793,79 @@ function renderGameSelect(){
   manualSel.onchange = renderManualResultBalls;
 }
 
-// ============ MULTI-COMBINATION TICKET ENTRY ============
-let TICKET_COMBOS = [ new Array(GAMES[0].balls).fill(null) ]; // array of number-arrays (null = empty slot)
+// ============ MULTI-COMBINATION TICKET ENTRY (persisted per game) ============
+// Each game keeps its own independent list of combinations, so switching the
+// game selector never loses what you've already typed for another game.
+const TICKET_COMBOS_BY_GAME = {};
+GAMES.forEach(g => { TICKET_COMBOS_BY_GAME[g.id] = [ new Array(g.balls).fill(null) ]; });
+
+function activeCombos(){
+  if(!TICKET_COMBOS_BY_GAME[currentGame.id]) TICKET_COMBOS_BY_GAME[currentGame.id] = [ new Array(currentGame.balls).fill(null) ];
+  return TICKET_COMBOS_BY_GAME[currentGame.id];
+}
 
 function addCombo(){
-  TICKET_COMBOS.push(new Array(currentGame.balls).fill(null));
+  activeCombos().push(new Array(currentGame.balls).fill(null));
   renderCombos();
 }
 
 function removeCombo(idx){
-  TICKET_COMBOS.splice(idx, 1);
-  if(TICKET_COMBOS.length === 0) TICKET_COMBOS.push(new Array(currentGame.balls).fill(null));
+  const combos = activeCombos();
+  combos.splice(idx, 1);
+  if(combos.length === 0) combos.push(new Array(currentGame.balls).fill(null));
   renderCombos();
   renderResultsAndComparisons();
 }
 
 function updateComboBall(comboIdx, ballIdx, value){
   const n = parseInt(value, 10);
-  TICKET_COMBOS[comboIdx][ballIdx] = isNaN(n) ? null : n;
+  activeCombos()[comboIdx][ballIdx] = isNaN(n) ? null : n;
   renderResultsAndComparisons();
 }
 
+// Paste a space-separated run of numbers into one combination row at once,
+// instead of clicking into each slot individually.
+function applyPasteToCombo(comboIdx, rawText){
+  const balls = currentGame.balls;
+  const nums = rawText.trim().split(/\s+/).filter(Boolean)
+    .map(n => parseInt(n,10))
+    .filter(n => !isNaN(n) && n >= 1 && n <= currentGame.maxNum);
+
+  const combo = activeCombos()[comboIdx];
+  for(let i=0;i<balls;i++){ combo[i] = nums[i] !== undefined ? nums[i] : null; }
+  renderCombos();
+  renderResultsAndComparisons();
+
+  if(nums.length < balls){
+    alert(`Combination #${comboIdx+1} needs ${balls} numbers, but ${nums.length} were entered \u2014 missing ${balls-nums.length} number(s). Please complete it.`);
+  } else if(nums.length > balls){
+    alert(`Combination #${comboIdx+1} only needs ${balls} numbers \u2014 the extra ones after the first ${balls} were ignored.`);
+  }
+}
+
 function renderCombos(){
+  const combos = activeCombos();
   const list = document.getElementById('combosList');
-  list.innerHTML = TICKET_COMBOS.map((combo, ci) => `
+  list.innerHTML = combos.map((combo, ci) => `
     <div class="combo-row">
       <div class="combo-num">#${ci+1}</div>
+      <div class="combo-paste">
+        <input type="text" class="combo-paste-input" placeholder="Or paste numbers, e.g. 3 7 12 19 25 33"
+          onkeydown="if(event.key==='Enter'){ event.preventDefault(); applyPasteToCombo(${ci}, this.value); this.value=''; }">
+        <button class="btn-mini" onclick="const inp=this.previousElementSibling; applyPasteToCombo(${ci}, inp.value); inp.value='';">Fill</button>
+      </div>
       <div class="combo-balls">
         ${combo.map((v,bi) => `<input class="ball-input mono" maxlength="2" inputmode="numeric"
             value="${v===null?'':v}"
             onchange="updateComboBall(${ci},${bi},this.value)">`).join('')}
       </div>
-      ${TICKET_COMBOS.length > 1 ? `<button class="combo-remove" onclick="removeCombo(${ci})">✕</button>` : ''}
+      ${combos.length > 1 ? `<button class="combo-remove" onclick="removeCombo(${ci})">✕</button>` : ''}
     </div>
   `).join('');
 }
 
 function getCombosFilled(){
-  return TICKET_COMBOS
+  return activeCombos()
     .map(c => c.filter(n => n !== null))
     .filter(c => c.length === currentGame.balls);
 }
@@ -858,7 +906,7 @@ document.getElementById('photoInput').addEventListener('change', async (e) => {
       return;
     }
 
-    TICKET_COMBOS = chunks.map(chunk => {
+    TICKET_COMBOS_BY_GAME[currentGame.id] = chunks.map(chunk => {
       const combo = new Array(balls).fill(null);
       chunk.forEach((n,i) => { combo[i] = n; });
       return combo;
@@ -886,12 +934,19 @@ const MAX_RANGE_DAYS = 31;
 
 let FETCHED_RESULTS = []; // [{date, game, gameLabel, numbers}]
 
+function toLocalISO(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
 function dateRangeArray(fromStr, toStr){
   const dates = [];
   let d = new Date(fromStr+'T00:00:00');
   const end = new Date(toStr+'T00:00:00');
   while(d <= end && dates.length < MAX_RANGE_DAYS){
-    dates.push(d.toISOString().slice(0,10));
+    dates.push(toLocalISO(d));
     d.setDate(d.getDate()+1);
   }
   return dates;
@@ -1129,7 +1184,7 @@ function logDrawResult(gameId, date, numbers){
 }
 
 function logUserPick(gameId, date, numbers){
-  MY_PICKS.push({date: date || new Date().toISOString().slice(0,10), gameId, numbers: [...numbers]});
+  MY_PICKS.push({date: date || toLocalISO(new Date()), gameId, numbers: [...numbers]});
   savePicks();
 }
 
@@ -1255,8 +1310,13 @@ function generateCombo(mode){
 function fillTicketWith(gameId, numbers){
   document.getElementById('gameSelect').value = gameId;
   currentGame = GAMES.find(g => g.id === gameId);
-  TICKET_COMBOS = [ new Array(currentGame.balls).fill(null) ];
-  numbers.forEach((n,i) => { if(i < currentGame.balls) TICKET_COMBOS[0][i] = n; });
+  const combo = new Array(currentGame.balls).fill(null);
+  numbers.forEach((n,i) => { if(i < currentGame.balls) combo[i] = n; });
+  // Add as a new combination rather than wiping this game's existing ones —
+  // if the only combo so far is still empty, replace it instead of stacking an extra blank row.
+  const combos = activeCombos();
+  const firstEmpty = combos.length === 1 && combos[0].every(v => v === null);
+  if(firstEmpty) combos[0] = combo; else combos.push(combo);
   renderCombos();
   renderResultsAndComparisons();
   document.querySelector('.ticket').scrollIntoView({behavior:'smooth'});
@@ -1357,9 +1417,9 @@ renderManualResultBalls();
   const today = new Date();
   const weekAgo = new Date();
   weekAgo.setDate(today.getDate() - 6);
-  document.getElementById('resultFromDate').valueAsDate = weekAgo;
-  document.getElementById('resultToDate').valueAsDate = today;
-  document.getElementById('manualResultDate').valueAsDate = today;
+  document.getElementById('resultFromDate').value = toLocalISO(weekAgo);
+  document.getElementById('resultToDate').value = toLocalISO(today);
+  document.getElementById('manualResultDate').value = toLocalISO(today);
 })();
 renderNextDraws();
 renderScheduleTable();
