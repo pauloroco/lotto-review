@@ -1,9 +1,9 @@
 // Lotto Review — service worker
 // Bumps CACHE_NAME whenever index.html changes so users get the latest version.
-const CACHE_NAME = 'lottoreview-cache-v1';
+const CACHE_NAME = 'lottoreview-cache-v2';
 const CORE_ASSETS = [
-  '/',
-  '/index.html',
+  '/app/',
+  '/app/index.html',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
@@ -36,10 +36,10 @@ self.addEventListener('fetch', (event) => {
       fetch(request)
         .then((res) => {
           const resClone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', resClone));
+          caches.open(CACHE_NAME).then((cache) => cache.put('/app/index.html', resClone));
           return res;
         })
-        .catch(() => caches.match('/index.html'))
+        .catch(() => caches.match('/app/index.html'))
     );
     return;
   }
