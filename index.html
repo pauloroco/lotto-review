@@ -318,11 +318,8 @@
     padding: 4vh 4vw; box-sizing:border-box;
   }
   .intro-splash.hide{ opacity:0; pointer-events:none; }
-  .intro-video-wrap{ position:relative; width:100%; height:100%; flex:1 1 auto; min-height:0; overflow:hidden; border-radius:14px; }
-  .intro-splash video{ width:100%; height:100%; object-fit:cover; display:block; }
-  @media (max-width: 600px){
-    .intro-splash video{ object-fit:contain; }
-  }
+  .intro-video-wrap{ position:relative; width:100%; height:100%; max-width:520px; max-height:100%; margin:0 auto; flex:1 1 auto; min-height:0; overflow:hidden; border-radius:14px; display:flex; align-items:center; justify-content:center; }
+  .intro-splash video{ width:100%; height:100%; object-fit:contain; display:block; }
   .intro-wm-cover{
     position:absolute; right:0; bottom:0; width:20%; height:16%;
     background:#000; pointer-events:none;
